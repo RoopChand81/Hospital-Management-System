@@ -2,6 +2,8 @@ import { catchAsyncErrors } from "../middlewares/catchAsyncErrors.js";
 import ErrorHandler from "../middlewares/error.js";
 import { Appointment } from "../models/appointmentSchema.js";
 import { User } from "../models/userSchema.js";
+import { patientAppointmentEmail } from "../mail/template/statusUpdate.js";
+import {mailSender} from "../utils/mailSender.js";
 
 export const postAppointment = catchAsyncErrors(async (req, res, next) => {
   const {
@@ -95,11 +97,31 @@ export const updateAppointmentStatus = catchAsyncErrors(
     if (!appointment) {
       return next(new ErrorHandler("Appointment not found!", 404));
     }
+
+    //update the DB;
     appointment = await Appointment.findByIdAndUpdate(id, req.body, {
       new: true,
       runValidators: true,
       useFindAndModify: false,
-    });
+    })
+
+    //send mail 
+    console.log("all Data", appointment);
+    const email=appointment.email;
+    const firstname=appointment.firstName;
+    const lastname=appointment.lastName;
+    const appointmentDate=appointment.appointment_date;
+    const doctorName=appointment.doctor.firstName+" "+appointment.doctor.lastName;
+    const status=appointment.status;
+    const template = patientAppointmentEmail(
+      email,
+      firstname,
+      lastname,
+      appointmentDate,
+      doctorName,
+      status
+    );
+    await mailSender(email, "Appointments Update", template);
     res.status(200).json({
       success: true,
       message: "Appointment Status Updated!",
